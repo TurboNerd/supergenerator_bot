@@ -3,9 +3,11 @@
 because we can
 
 # Python setup (macOS)
-1. install/update [homebrew](https://brew.sh/)
-2. install python3 `$ brew install python3`
-**NOTE:** `python` points to system installation (tipycally 2.7.X), `python3` points to homebrew installation
+1. install\/update [homebrew](https://brew.sh/)
+2. install python3: `$ brew install python3`
+    
+    **NOTE:** `python` points to system installation (tipycally 2.7.X), `python3` points to homebrew installation
+
 3. configure virtual environment
     ```
     $ mkdir python_envs
