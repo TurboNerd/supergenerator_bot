@@ -2,6 +2,10 @@
 
 because we can
 
+# Run the bot
+
+is as simple as: `./supergenerator.py`
+
 # Python setup (macOS)
 1. install\/update [homebrew](https://brew.sh/)
 2. install python3: `$ brew install python3`
