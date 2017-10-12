@@ -18,12 +18,12 @@ because we can
     # deactivate the env:
     $ deactivate
     ```
-    **NOTE:** python --version points to python3 and also does pip
+    **NOTE:** `python --version` points to python3 and also does pip
 4. install dependecies: 
     ```
     $ source python_envs/supergenerator/bin/activate
     $ cd supergenerator_bot/
-    $ pip install -r requirements.txt`
+    $ pip install -r requirements.txt
     ```
     
 ##### Update requirements file:
