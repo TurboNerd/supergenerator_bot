@@ -21,8 +21,11 @@ DEPOSIT_LIMIT = 0.5
 DATE_FORMAT = "%d/%m/%Y %H:%M:%S"
 
 # preserve deposits TODO use mongo!
-shares = {}
-
+shares = {
+    "total_investment": 0,
+    "total_invested": 0,
+    "investments": {}
+}
 
 #############################
 #         functions         #
@@ -34,7 +37,7 @@ def get_full_name(update):
     return update.message.from_user.first_name + " " + update.message.from_user.last_name
 
 def init(name):
-    shares[name] = {
+    shares["investments"][name] = {
         'last_deposit': 0,
         'deposits': [],
         'total_shares': 0
@@ -42,29 +45,32 @@ def init(name):
 
 def add_deposit(name, value):
     time = get_epoch()
-    shares[name]["last_deposit"] = time
-    shares[name]["deposits"].append({
+    shares["investments"][name]["last_deposit"] = time
+    shares["investments"][name]["deposits"].append({
         "timestamp": time,
         "amount": value
     })
-    shares[name]["total_shares"] = round(shares[name]["total_shares"] + value, 2)
+    shares["investments"][name]["total_shares"] = round(shares["investments"][name]["total_shares"] + value, 2)
+    shares["total_investment"] = round(shares["total_investment"] + value, 2)
 
 def get_string_shares():
     string = ""
-    for person in shares:
+    for person in shares["investments"]:
         string += "*"
         string += person
         string += "* has a total share of *"
-        string += str(shares[person]["total_shares"])
-        string += "* €, last deposit was on: "
-        string += time.strftime(DATE_FORMAT, time.localtime(shares[person]["last_deposit"]))
-        string += "\n"
+        string += str(shares["investments"][person]["total_shares"])
+        string += "* and thus owns: *"
+        string += str(round(shares["total_investment"] * 100 / shares["investments"][person]["total_shares"], 2)) + " %"
+        string += "* of the company"
+    if string == "":
+        string = "Nobody have invested in this company yet! go to Notaro!!!"
     return string
 
 def get_string_history(name):
     history = ""
     try:
-        for data in shares[name]["deposits"]:
+        for data in shares["investments"][name]["deposits"]:
             history += "on "
             history += time.strftime(DATE_FORMAT, time.localtime(data["timestamp"]))
             history += " deposited "
@@ -101,6 +107,9 @@ def deposit(bot, update):
     try:
         name = get_full_name(update)
         value = float(re.sub(r'(?i)/deposit\s+', "", update.message.text))
+        if value <= 0:
+            bot.send_message(chat_id=chat_id, text="positive float value please")
+            return
         if value > 0.5:
             logger.debug('"%s" deposit (%s) is over current limit of: "%s"' % (name, value, DEPOSIT_LIMIT))
             bot.send_message(chat_id=chat_id, text="deposit limit is set to " + str(DEPOSIT_LIMIT))
@@ -110,7 +119,7 @@ def deposit(bot, update):
         add_deposit(name, value)
         bot.send_message(chat_id=chat_id, text=get_string_shares(), parse_mode=telegram.ParseMode.MARKDOWN)
     except ValueError:
-        bot.send_message(chat_id=chat_id, text="float value please")
+        bot.send_message(chat_id=chat_id, text="positive float value please")
 
 def status(bot, update):
     chat_id = update.message.chat_id
