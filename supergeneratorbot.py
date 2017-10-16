@@ -7,7 +7,6 @@ from telegram.ext import CommandHandler
 from telegram.ext import (MessageHandler, Filters)
 import itertools
 import time
-from pprint import pformat
 from random import randrange
 import re
 
@@ -30,11 +29,8 @@ shares = {}
 def get_epoch():
     return int(time.time())
 
-def pprint(object):
-    return pformat(object, indent=4)
-
-def get_full_name(chat):
-    return chat.first_name + " " + chat.last_name
+def get_full_name(update):
+    return update.message.from_user.first_name + " " + update.message.from_user.last_name
 
 def init(name):
     shares[name] = {
@@ -102,7 +98,7 @@ def deposit(bot, update):
     logger.debug('generate command received from chat "%s"' % (chat_id))
 
     try:
-        name = get_full_name(update.message.chat)
+        name = get_full_name(update)
         value = float(re.sub(r'(?i)/deposit\s+', "", update.message.text))
         if value > 0.5:
             logger.debug('"%s" deposit (%s) is over current limit of: "%s"' % (name, value, DEPOSIT_LIMIT))
@@ -121,7 +117,7 @@ def status(bot, update):
 
 def history(bot, update):
     chat_id = update.message.chat_id
-    name = get_full_name(update.message.chat)
+    name = get_full_name(update)
     bot.send_message(chat_id=chat_id, text=get_string_history(name))
 
 def pizza(bot, update):
