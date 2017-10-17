@@ -36,6 +36,15 @@ def get_epoch():
 def get_full_name(update):
     return update.message.from_user.first_name + " " + update.message.from_user.last_name
 
+def get_investments(name):
+    if name not in shares["investments"]:
+        init(name)
+    return shares["investments"][name]
+
+def get_deposits(name):
+    investments = get_investments(name)
+    return investments["deposits"]
+
 def init(name):
     shares["investments"][name] = {
         'last_deposit': 0,
@@ -45,38 +54,42 @@ def init(name):
 
 def add_deposit(name, value):
     time = get_epoch()
-    shares["investments"][name]["last_deposit"] = time
-    shares["investments"][name]["deposits"].append({
+    investments = get_investments(name)
+    investments["last_deposit"] = time
+    investments["deposits"].append({
         "timestamp": time,
         "amount": value
     })
-    shares["investments"][name]["total_shares"] = round(shares["investments"][name]["total_shares"] + value, 2)
+    investments["total_shares"] = round(investments["total_shares"] + value, 2)
     shares["total_investment"] = round(shares["total_investment"] + value, 2)
 
 def get_string_shares():
-    string = ""
+    status = "Total investment: *"
+    status += str(shares["total_investment"])
+    status += "*\n"
+    status += "Total invested: *"
+    status += str(shares["total_invested"])
+    status += "*\n\n"
     for person in shares["investments"]:
-        string += "*"
-        string += person
-        string += "* has a total share of *"
-        string += str(shares["investments"][person]["total_shares"])
-        string += "* and thus owns: *"
-        string += str(round(shares["total_investment"] * 100 / shares["investments"][person]["total_shares"], 2)) + " %"
-        string += "* of the company"
-    if string == "":
-        string = "Nobody have invested in this company yet! go to Notaro!!!"
-    return string
+        status += "*"
+        status += person
+        status += "* has a total share of *"
+        status += str(shares["investments"][person]["total_shares"])
+        status += "* and thus owns: *"
+        percent = (shares["investments"][person]["total_shares"] / shares["total_investment"]) * 100
+        status += str(round(percent, 2)) + " %"
+        status += "* of the company\n"
+    return status
 
 def get_string_history(name):
     history = ""
-    try:
-        for data in shares["investments"][name]["deposits"]:
-            history += "on "
-            history += time.strftime(DATE_FORMAT, time.localtime(data["timestamp"]))
-            history += " deposited "
-            history += str(data["amount"])
-            history += " €\n"
-    except KeyError:
+    for data in get_deposits(name):
+        history += "on _"
+        history += time.strftime(DATE_FORMAT, time.localtime(data["timestamp"]))
+        history += "_ deposited *"
+        history += str(data["amount"])
+        history += " €*\n"
+    if history == "":
         history = "you have no shares! go to Notaro!!!"
     return history
 
@@ -114,8 +127,6 @@ def deposit(bot, update):
             logger.debug('"%s" deposit (%s) is over current limit of: "%s"' % (name, value, DEPOSIT_LIMIT))
             bot.send_message(chat_id=chat_id, text="deposit limit is set to " + str(DEPOSIT_LIMIT))
             return
-        if name not in shares:
-            init(name)
         add_deposit(name, value)
         bot.send_message(chat_id=chat_id, text=get_string_shares(), parse_mode=telegram.ParseMode.MARKDOWN)
     except ValueError:
@@ -128,7 +139,7 @@ def status(bot, update):
 def history(bot, update):
     chat_id = update.message.chat_id
     name = get_full_name(update)
-    bot.send_message(chat_id=chat_id, text=get_string_history(name))
+    bot.send_message(chat_id=chat_id, text=get_string_history(name), parse_mode=telegram.ParseMode.MARKDOWN)
 
 def pizza(bot, update):
     chat_id = update.message.chat_id
