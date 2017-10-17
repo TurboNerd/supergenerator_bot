@@ -10,6 +10,7 @@ import itertools
 import time
 from random import randrange
 import re
+import requests
 
 # enable loggiing
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -141,9 +142,25 @@ def history(bot, update):
     name = get_full_name(update)
     bot.send_message(chat_id=chat_id, text=get_string_history(name), parse_mode=telegram.ParseMode.MARKDOWN)
 
-def pizza(bot, update):
+def easter(bot, update):
     chat_id = update.message.chat_id
-    bot.send_message(chat_id=chat_id, text="pizza")
+    endpoint = "https://api.giphy.com/v1/gifs/search"
+    api_key = "api_key=7QWJfvVB2jfuRKfIkUQAONETT2vVcp3g"
+    query = "q=" + update.message.text
+    parmas = "&limit=25&lang=it"
+    url = endpoint + "?" + api_key + "&" + query + "&" + parmas
+    logger.debug('ask for gif at: %s' % (url))
+    response = requests.get(url)
+    if(response.status_code != 200):
+        bot.send_message(chat_id=chat_id, text="sorry, I don't get it")
+    json = response.json()
+    try:
+        image = json["data"][randrange(0, 24)]
+        image_url = image["images"]["fixed_height"]["url"]
+        logger.debug('gif url: %s' % (image_url))
+        bot.send_video(chat_id=chat_id, video=image_url)
+    except IndexError:
+        bot.send_message(chat_id=chat_id, text="nothing fun to say about \"" + update.message.text + "\"")
 
 def error(bot, update, error):
     logger.error('Update "%s" caused error "%s"' % (update, error))
@@ -164,8 +181,8 @@ def main():
     dispatcher.add_handler(CommandHandler('status', status))
     dispatcher.add_handler(CommandHandler('history', history))
 
-    # on noncommand i.e message - send a pizza
-    dispatcher.add_handler(MessageHandler(Filters.text, pizza))
+    # on noncommand i.e message - send a gif
+    dispatcher.add_handler(MessageHandler(Filters.text, easter))
 
     # log all errors
     dispatcher.add_error_handler(error)
