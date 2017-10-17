@@ -6,6 +6,15 @@ because we can
 
 is as simple as: `./supergenerator.py`
 
+but that's good for _testing_, if you want a more consistent way to handle this use the provided bash scripts:
+
+`start.sh` that will:
+  - start the bot
+  - redirect logs to `./logs/{timestamp}.log`
+  - write a PID file to `./run/supergeneratorbot.pid`
+
+`stop.sh` that will just kill the process in PID file
+
 # Python setup (macOS)
 1. install\/update [homebrew](https://brew.sh/)
 2. install python3: `$ brew install python3`
