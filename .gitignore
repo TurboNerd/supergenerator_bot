@@ -111,3 +111,6 @@ logs/*
 
 # pidfiles
 run/*
+
+# settings
+settings.json

@@ -1,0 +1,7 @@
+{
+  "telegram_key": "api-key",
+  "giphy_key": "api-key (optional)",
+  "notaro": "notaro's name",
+  "deposit_limit": 0.5,
+  "date_format": "%d/%m/%Y %H:%M:%S"
+}

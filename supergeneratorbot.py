@@ -11,15 +11,12 @@ import time
 from random import randrange
 import re
 import requests
+import json
 
 # enable loggiing
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-
-# constants TODO make this configurable
-DEPOSIT_LIMIT = 0.5
-DATE_FORMAT = "%d/%m/%Y %H:%M:%S"
 
 # preserve deposits TODO use mongo!
 shares = {
@@ -27,6 +24,48 @@ shares = {
     "total_invested": 0,
     "investments": {}
 }
+#############################
+#       configuration       #
+#############################
+# TODO make this a class/module whathever
+config = {}
+def read_config():
+    global config
+    with open('settings.json') as json_file:
+        config = json.load(json_file)
+        verify_config()
+
+def verify_config():
+    try:
+        get_telegram_key()
+        get_notaro()
+        get_deposit_limit()
+        get_date_format()
+    except KeyError as e:
+        logger.error('key %s is required' % (e))
+
+def get_telegram_key():
+    global config
+    return config["telegram_key"]
+
+def get_giphy_key():
+    global config
+    try:
+        return config["giphy_key"]
+    except KeyError:
+        return ""
+
+def get_notaro():
+    global config
+    return config["notaro"]
+
+def get_deposit_limit():
+    global config
+    return config["deposit_limit"]
+
+def get_date_format():
+    global config
+    return config["date_format"]
 
 #############################
 #         functions         #
@@ -86,7 +125,7 @@ def get_string_history(name):
     history = ""
     for data in get_deposits(name):
         history += "on _"
-        history += time.strftime(DATE_FORMAT, time.localtime(data["timestamp"]))
+        history += time.strftime(get_date_format(), time.localtime(data["timestamp"]))
         history += "_ deposited *"
         history += str(data["amount"])
         history += " €*\n"
@@ -124,9 +163,10 @@ def deposit(bot, update):
         if value <= 0:
             bot.send_message(chat_id=chat_id, text="positive float value please")
             return
-        if value > 0.5:
-            logger.debug('"%s" deposit (%s) is over current limit of: "%s"' % (name, value, DEPOSIT_LIMIT))
-            bot.send_message(chat_id=chat_id, text="deposit limit is set to " + str(DEPOSIT_LIMIT))
+        limit = get_deposit_limit()
+        if value > limit:
+            logger.debug('"%s" deposit (%s) is over current limit of: "%s"' % (name, value, limit))
+            bot.send_message(chat_id=chat_id, text="deposit limit is set to " + str(limit))
             return
         add_deposit(name, value)
         bot.send_message(chat_id=chat_id, text=get_string_shares(), parse_mode=telegram.ParseMode.MARKDOWN)
@@ -144,8 +184,12 @@ def history(bot, update):
 
 def easter(bot, update):
     chat_id = update.message.chat_id
+    giphy_key = get_giphy_key()
+    if giphy_key == "":
+        bot.send_message(chat_id=chat_id, text=update.message.text)
+        return
     endpoint = "https://api.giphy.com/v1/gifs/search"
-    api_key = "api_key=7QWJfvVB2jfuRKfIkUQAONETT2vVcp3g"
+    api_key = "api_key=" + giphy_key
     query = "q=" + update.message.text
     parmas = "&limit=25&lang=it"
     url = endpoint + "?" + api_key + "&" + query + "&" + parmas
@@ -160,7 +204,7 @@ def easter(bot, update):
         logger.debug('gif url: %s' % (image_url))
         bot.send_video(chat_id=chat_id, video=image_url)
     except IndexError:
-        bot.send_message(chat_id=chat_id, text="nothing fun to say about \"" + update.message.text + "\"")
+        bot.send_message(chat_id=chat_id, text='nothing fun to say about "' + update.message.text + '"')
 
 def error(bot, update, error):
     logger.error('Update "%s" caused error "%s"' % (update, error))
@@ -169,7 +213,9 @@ def error(bot, update, error):
 #           main            #
 #############################
 def main():
-    updater = Updater(token='366686623:AAE0Z5QJ-Y_m9a5maG9N2XOqqRPrcYIU-zk')
+    read_config()
+
+    updater = Updater(token=get_telegram_key())
 
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher

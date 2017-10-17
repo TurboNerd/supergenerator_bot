@@ -29,6 +29,7 @@ is as simple as: `./supergenerator.py`
     $ cd supergenerator_bot/
     $ pip install -r requirements.txt
     ```
+5. write your configuration in `settings.json`. For details see template configuration file: `settings.template.json`
 
 ##### Update requirements file:
 In case other dependencies are added during development, to update the requirements file run:
