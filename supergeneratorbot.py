@@ -12,6 +12,7 @@ from random import randrange
 import re
 import requests
 import json
+import urllib
 
 # enable loggiing
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -24,6 +25,7 @@ shares = {
     "total_invested": 0,
     "investments": {}
 }
+
 #############################
 #       configuration       #
 #############################
@@ -39,7 +41,8 @@ def verify_config():
     try:
         get_telegram_key()
         get_notaro()
-        get_deposit_limit()
+        get_deposit_amount_limit()
+        get_deposit_time_limit()
         get_date_format()
     except KeyError as e:
         logger.error('key %s is required' % (e))
@@ -59,13 +62,36 @@ def get_notaro():
     global config
     return config["notaro"]
 
-def get_deposit_limit():
+def get_deposit_amount_limit():
     global config
-    return config["deposit_limit"]
+    return config["deposit"]["amount"]
+
+def get_deposit_time_limit():
+    global config
+    return config["deposit"]["time"]
 
 def get_date_format():
     global config
     return config["date_format"]
+
+
+#############################
+#        exceptions         #
+#############################
+class GiphyException(Exception):
+    pass
+
+class GifNotFoundException(Exception):
+    pass
+
+class DepositException(Exception):
+    pass
+
+class DepositAmountLimitException(DepositException):
+    pass
+
+class DepositDailyLimitException(DepositException):
+    pass
 
 #############################
 #         functions         #
@@ -93,8 +119,20 @@ def init(name):
     }
 
 def add_deposit(name, value):
-    time = get_epoch()
     investments = get_investments(name)
+    time = get_epoch()
+    limit = get_deposit_time_limit()
+    diff = time - investments["last_deposit"]
+    if(diff < limit):
+        logger.debug('"%s" deposit time limit is set to "%s", last deposit was "%s" secs ago' % (name, limit, diff))
+        message = 'deposit time limit is set to ' + str(limit) + ', last deposit was ' + str(diff) + ' secs ago'
+        raise DepositDailyLimitException(message)
+
+    limit = get_deposit_amount_limit()
+    if value > limit:
+        logger.debug('"%s" deposit (%s) is over current limit of: "%s"' % (name, value, limit))
+        raise DepositAmountLimitException("deposit limit is set to " + str(limit))
+
     investments["last_deposit"] = time
     investments["deposits"].append({
         "timestamp": time,
@@ -115,7 +153,7 @@ def get_string_shares():
         status += person
         status += "* has a total share of *"
         status += str(shares["investments"][person]["total_shares"])
-        status += "* and thus owns: *"
+        status += "* and thus owns *"
         percent = (shares["investments"][person]["total_shares"] / shares["total_investment"]) * 100
         status += str(round(percent, 2)) + " %"
         status += "* of the company\n"
@@ -133,6 +171,39 @@ def get_string_history(name):
         history = "you have no shares! go to Notaro!!!"
     return history
 
+def get_gif(api_key, query):
+    endpoint = "https://api.giphy.com/v1/gifs/search"
+    giphy_key = "api_key=" + api_key
+    query = "q=" + urllib.parse.quote_plus(query)
+    parmas = "limit=25&rating=g"
+    url = endpoint + "?" + giphy_key + "&" + query + "&" + parmas
+    logger.debug('ask for gif at: %s' % (url))
+    response = requests.get(url)
+    logger.debug('response status: %s' % (response.status_code))
+    if(response.status_code != 200):
+        raise GiphyException("request error " + str(response))
+        return
+    json = response.json()
+    logger.debug("%s gif returned", len(json["data"]))
+    if len(json["data"]) == 0:
+        raise GifNotFoundException
+        return
+    try:
+        index = randrange(0, len(json["data"]))
+        logger.debug("choosed gif #%s" % (index))
+        image = json["data"][index]
+        image_url = image["images"]["fixed_height"]["url"]
+        logger.debug('url: %s' % (image_url))
+        return image_url
+    except IndexError:
+        raise GifNotFoundException
+
+def parse_float_deposit(text):
+    value = float(re.sub(r'(?i)/deposit(?:@supergeneratorbot)?\s+', "", text))
+    if value <= 0:
+        raise ValueError
+    return value
+
 #############################
 #         commands          #
 #############################
@@ -149,7 +220,7 @@ def generate(bot, update):
     for _ in itertools.repeat(None, 6):
         sequence.append(randrange(1, 90))
 
-    sequence_string = ','.join(map(str, sequence))
+    sequence_string = ', '.join(map(str, sequence))
     logger.debug('generated sequence is: "%s"' % (sequence_string))
     bot.send_message(chat_id=chat_id, text="supergenerated sequence: " + sequence_string)
 
@@ -158,20 +229,18 @@ def deposit(bot, update):
     logger.debug('generate command received from chat "%s"' % (chat_id))
 
     try:
-        name = get_full_name(update)
-        value = float(re.sub(r'(?i)/deposit\s+', "", update.message.text))
-        if value <= 0:
-            bot.send_message(chat_id=chat_id, text="positive float value please")
-            return
-        limit = get_deposit_limit()
-        if value > limit:
-            logger.debug('"%s" deposit (%s) is over current limit of: "%s"' % (name, value, limit))
-            bot.send_message(chat_id=chat_id, text="deposit limit is set to " + str(limit))
-            return
-        add_deposit(name, value)
-        bot.send_message(chat_id=chat_id, text=get_string_shares(), parse_mode=telegram.ParseMode.MARKDOWN)
+        value = parse_float_deposit(update.message.text)
     except ValueError:
         bot.send_message(chat_id=chat_id, text="positive float value please")
+        return
+
+    name = get_full_name(update)
+    try:
+        add_deposit(name, value)
+        bot.send_message(chat_id=chat_id, text=get_string_shares(), parse_mode=telegram.ParseMode.MARKDOWN)
+    except DepositException as e:
+        bot.send_message(chat_id=chat_id, text=str(e))
+        return
 
 def status(bot, update):
     chat_id = update.message.chat_id
@@ -186,24 +255,16 @@ def easter(bot, update):
     chat_id = update.message.chat_id
     giphy_key = get_giphy_key()
     if giphy_key == "":
+        # act as an echo bot
         bot.send_message(chat_id=chat_id, text=update.message.text)
         return
-    endpoint = "https://api.giphy.com/v1/gifs/search"
-    api_key = "api_key=" + giphy_key
-    query = "q=" + update.message.text
-    parmas = "&limit=25&lang=it"
-    url = endpoint + "?" + api_key + "&" + query + "&" + parmas
-    logger.debug('ask for gif at: %s' % (url))
-    response = requests.get(url)
-    if(response.status_code != 200):
-        bot.send_message(chat_id=chat_id, text="sorry, I don't get it")
-    json = response.json()
+
     try:
-        image = json["data"][randrange(0, 24)]
-        image_url = image["images"]["fixed_height"]["url"]
-        logger.debug('gif url: %s' % (image_url))
-        bot.send_video(chat_id=chat_id, video=image_url)
-    except IndexError:
+        gif_url = get_gif(giphy_key, update.message.text)
+        bot.send_video(chat_id=chat_id, video=gif_url)
+    except GiphyException:
+        bot.send_message(chat_id=chat_id, text="sorry, I don't get it")
+    except GifNotFoundException:
         bot.send_message(chat_id=chat_id, text='nothing fun to say about "' + update.message.text + '"')
 
 def error(bot, update, error):

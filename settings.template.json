@@ -2,6 +2,9 @@
   "telegram_key": "api-key",
   "giphy_key": "api-key (optional)",
   "notaro": "notaro's name",
-  "deposit_limit": 0.5,
+  "deposit": {
+    "amount": 0.5,
+    "time": 86400
+  },
   "date_format": "%d/%m/%Y %H:%M:%S"
 }
