@@ -13,6 +13,7 @@ import re
 import requests
 import json
 import urllib
+from pymongo import MongoClient
 
 # enable loggiing
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
