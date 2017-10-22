@@ -31,6 +31,7 @@ shares = {
 #############################
 # TODO make this a class/module whathever
 config = {}
+
 def read_config():
     global config
     with open('settings.json') as json_file:
@@ -74,7 +75,6 @@ def get_date_format():
     global config
     return config["date_format"]
 
-
 #############################
 #        exceptions         #
 #############################
@@ -104,7 +104,7 @@ def get_full_name(update):
 
 def get_investments(name):
     if name not in shares["investments"]:
-        init(name)
+        return None
     return shares["investments"][name]
 
 def get_deposits(name):
@@ -118,8 +118,7 @@ def init(name):
         'total_shares': 0
     }
 
-def add_deposit(name, value):
-    investments = get_investments(name)
+def check_deposit_time(name, investments, value):
     time = get_epoch()
     limit = get_deposit_time_limit()
     diff = time - investments["last_deposit"]
@@ -128,10 +127,23 @@ def add_deposit(name, value):
         message = 'deposit time limit is set to ' + str(limit) + ', last deposit was ' + str(diff) + ' secs ago'
         raise DepositDailyLimitException(message)
 
+def check_deposit_amount(name, value):
     limit = get_deposit_amount_limit()
     if value > limit:
         logger.debug('"%s" deposit (%s) is over current limit of: "%s"' % (name, value, limit))
         raise DepositAmountLimitException("deposit limit is set to " + str(limit))
+
+def add_deposit(name, value):
+    investments = get_investments(name)
+    try:
+        if investments is not None:
+            check_deposit_time(name, investments, value)
+        check_deposit_amount(name, value)
+        if investments is None:
+            init(name)
+            investments = get_investments(name)
+    except:
+        raise
 
     investments["last_deposit"] = time
     investments["deposits"].append({
