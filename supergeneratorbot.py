@@ -109,7 +109,9 @@ def get_investments(name):
 
 def get_deposits(name):
     investments = get_investments(name)
-    return investments["deposits"]
+    if investments is not None:
+        return investments["deposits"]
+    return []
 
 def init(name):
     shares["investments"][name] = {
@@ -118,8 +120,7 @@ def init(name):
         'total_shares': 0
     }
 
-def check_deposit_time(name, investments, value):
-    time = get_epoch()
+def check_deposit_time(time, name, investments):
     limit = get_deposit_time_limit()
     diff = time - investments["last_deposit"]
     if(diff < limit):
@@ -134,10 +135,11 @@ def check_deposit_amount(name, value):
         raise DepositAmountLimitException("deposit limit is set to " + str(limit))
 
 def add_deposit(name, value):
+    time = get_epoch()
     investments = get_investments(name)
     try:
         if investments is not None:
-            check_deposit_time(name, investments, value)
+            check_deposit_time(time, name, investments)
         check_deposit_amount(name, value)
         if investments is None:
             init(name)
