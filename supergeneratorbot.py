@@ -14,13 +14,14 @@ import requests
 import json
 import urllib
 from pymongo import MongoClient
+from urllib.parse import quote_plus
 
 # enable loggiing
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# preserve deposits TODO use mongo!
+# preserve deposits TODO use mongo! (YEAH!!! +1 Billi)
 shares = {
     "total_investment": 0,
     "total_invested": 0,
@@ -30,7 +31,7 @@ shares = {
 #############################
 #       configuration       #
 #############################
-# TODO make this a class/module whathever
+# TODO make this a class/module whathever (+1 Billi)
 config = {}
 def read_config():
     global config
@@ -45,6 +46,7 @@ def verify_config():
         get_deposit_amount_limit()
         get_deposit_time_limit()
         get_date_format()
+        get_mongo_connection()
     except KeyError as e:
         logger.error('key %s is required' % (e))
 
@@ -75,6 +77,9 @@ def get_date_format():
     global config
     return config["date_format"]
 
+def get_mongo_connection():
+    global config
+    return config["mongo_connection"]
 
 #############################
 #        exceptions         #
@@ -204,6 +209,16 @@ def parse_float_deposit(text):
     if value <= 0:
         raise ValueError
     return value
+
+def persist(shares):
+    if get_mongo_connection() is None:
+        client = MongoClient()
+    else
+        uri = "mongodb://%s:%s@%s" % (quote_plus(user), quote_plus(password), host)
+        client = MongoClient(uri)
+    db = client.supergenerator
+    db.shares.insertOne(user)
+    # TODO add serializer shares -> mongodb structure    
 
 #############################
 #         commands          #
