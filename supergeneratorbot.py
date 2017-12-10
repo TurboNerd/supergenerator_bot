@@ -21,12 +21,33 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
                     level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# preserve deposits TODO use mongo! (YEAH!!! +1 Billi)
+# preserve deposits TODO use mongo!
+# {
+#   "total_investment": int,
+#   "total_invested": int,
+#   "investments": {
+#     "name": {
+#       "name": string,
+#       "last_deposit": time,
+#       "total_shares": int,
+#       "deposits": [
+#         {
+#           "timestamp": time,
+#           "amount": int
+#         }
+#       ]
+#     }
+#   }
+# }
 shares = {
     "total_investment": 0,
     "total_invested": 0,
     "investments": {}
 }
+
+# Connection to mongodb
+# TODO read connection from config
+db = MongoClient().supergenerator
 
 #############################
 #       configuration       #
@@ -119,6 +140,7 @@ def get_deposits(name):
 
 def init(name):
     shares["investments"][name] = {
+        'name': name,
         'last_deposit': 0,
         'deposits': [],
         'total_shares': 0
@@ -139,12 +161,29 @@ def add_deposit(name, value):
         logger.debug('"%s" deposit (%s) is over current limit of: "%s"' % (name, value, limit))
         raise DepositAmountLimitException("deposit limit is set to " + str(limit))
 
-    investments["last_deposit"] = time
-    investments["deposits"].append({
-        "timestamp": time,
-        "amount": value
-    })
-    investments["total_shares"] = round(investments["total_shares"] + value, 2)
+def add_deposit(name, value):
+    time = get_epoch()
+    investment = get_investments(name)
+    try:
+        if investment is not None:
+            check_deposit_time(time, name, investment)
+            check_deposit_amount(name, value)
+        if investments is None:
+            init(name)
+            investment = get_investments(name)
+            db.investments.insert_one(investment)
+    except:
+        raise
+
+    investment["last_deposit"] = time
+    deposit = {
+        'timestamp': time,
+        'amount': value
+    }
+    investment["deposits"].append(deposit)
+
+    db.investments.update_one({'name': name}, {'$push': {'deposits': deposit}})
+    investment["total_shares"] = round(investment["total_shares"] + value, 2)
     shares["total_investment"] = round(shares["total_investment"] + value, 2)
 
 def get_string_shares():
