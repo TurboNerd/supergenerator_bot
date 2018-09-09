@@ -14,12 +14,13 @@ import requests
 import json
 import urllib
 
-# enable loggiing
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.DEBUG)
+import config
+
+# enable logging
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# preserve deposits TODO use mongo!
+# preserve deposits. TODO use mongo!
 shares = {
     "total_investment": 0,
     "total_invested": 0,
