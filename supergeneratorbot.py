@@ -29,55 +29,6 @@ shares = {
 }
 
 #############################
-#       configuration       #
-#############################
-# TODO make this a class/module whathever
-config = {}
-
-def read_config():
-    global config
-    with open('settings.json') as json_file:
-        config = json.load(json_file)
-        verify_config()
-
-def verify_config():
-    try:
-        get_telegram_key()
-        get_notaro()
-        get_deposit_amount_limit()
-        get_deposit_time_limit()
-        get_date_format()
-    except KeyError as e:
-        logger.error('key %s is required' % (e))
-
-def get_telegram_key():
-    global config
-    return config["telegram_key"]
-
-def get_giphy_key():
-    global config
-    try:
-        return config["giphy_key"]
-    except KeyError:
-        return ""
-
-def get_notaro():
-    global config
-    return config["notaro"]
-
-def get_deposit_amount_limit():
-    global config
-    return config["deposit"]["amount"]
-
-def get_deposit_time_limit():
-    global config
-    return config["deposit"]["time"]
-
-def get_date_format():
-    global config
-    return config["date_format"]
-
-#############################
 #        exceptions         #
 #############################
 class GiphyException(Exception):
@@ -123,7 +74,7 @@ def init(name):
     }
 
 def check_deposit_time(time, name, investments):
-    limit = get_deposit_time_limit()
+    limit = config.get_deposit_time_limit()
     diff = time - investments["last_deposit"]
     if(diff < limit):
         logger.debug('"%s" deposit time limit is set to "%s", last deposit was "%s" secs ago' % (name, limit, diff))
@@ -131,7 +82,7 @@ def check_deposit_time(time, name, investments):
         raise DepositDailyLimitException(message)
 
 def check_deposit_amount(name, value):
-    limit = get_deposit_amount_limit()
+    limit = config.get_deposit_amount_limit()
     if value > limit:
         logger.debug('"%s" deposit (%s) is over current limit of: "%s"' % (name, value, limit))
         raise DepositAmountLimitException("deposit limit is set to " + str(limit))
@@ -179,7 +130,7 @@ def get_string_history(name):
     history = ""
     for data in get_deposits(name):
         history += "on _"
-        history += time.strftime(get_date_format(), time.localtime(data["timestamp"]))
+        history += time.strftime(config.get_date_format(), time.localtime(data["timestamp"]))
         history += "_ deposited *"
         history += str(data["amount"])
         history += " €*\n"
@@ -269,7 +220,7 @@ def history(bot, update):
 
 def easter(bot, update):
     chat_id = update.message.chat_id
-    giphy_key = get_giphy_key()
+    giphy_key = config.get_giphy_key()
     if giphy_key == "":
         # act as an echo bot
         bot.send_message(chat_id=chat_id, text=update.message.text)
@@ -290,9 +241,9 @@ def error(bot, update, error):
 #           main            #
 #############################
 def main():
-    read_config()
+    config.read_config('settings.json')
 
-    updater = Updater(token=get_telegram_key())
+    updater = Updater(token=config.get_telegram_key())
 
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher
