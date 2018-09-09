@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 
-EXEC=./supergeneratorbot.py
+PROGRAM=supergeneratorbot
+
+EXEC=./$PROGRAM.py
 RUN_DIR=./run
-PID_FILE=$RUN_DIR/supergeneratorbot.pid
+PID_FILE=$RUN_DIR/$PROGRAM.pid
 LOG_DIR=./logs
 LOG_FILE=$LOG_DIR/`date '+%Y%m%d%H%M%S'`.log
 
@@ -19,4 +21,4 @@ fi
 $EXEC > $LOG_FILE 2>&1 &
 PID=$!
 echo $PID > $PID_FILE
-echo "supergenerator bot started, pid is: $PID, pid file: $PID_FILE, log file: $LOG_FILE"
+echo "$PROGRAM bot started, pid is: $PID, pid file: $PID_FILE, log file: $LOG_FILE"

@@ -16,9 +16,11 @@ import urllib
 from pymongo import MongoClient
 from urllib.parse import quote_plus
 
-# enable loggiing
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.DEBUG)
+import config
+
+# enable logging
+logFormat = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+logging.basicConfig(format=logFormat, level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # preserve deposits TODO use mongo!
@@ -50,72 +52,25 @@ shares = {
 db = MongoClient().supergenerator
 
 #############################
-#       configuration       #
-#############################
-# TODO make this a class/module whathever (+1 Billi)
-config = {}
-def read_config():
-    global config
-    with open('settings.json') as json_file:
-        config = json.load(json_file)
-        verify_config()
-
-def verify_config():
-    try:
-        get_telegram_key()
-        get_notaro()
-        get_deposit_amount_limit()
-        get_deposit_time_limit()
-        get_date_format()
-        get_mongo_connection()
-    except KeyError as e:
-        logger.error('key %s is required' % (e))
-
-def get_telegram_key():
-    global config
-    return config["telegram_key"]
-
-def get_giphy_key():
-    global config
-    try:
-        return config["giphy_key"]
-    except KeyError:
-        return ""
-
-def get_notaro():
-    global config
-    return config["notaro"]
-
-def get_deposit_amount_limit():
-    global config
-    return config["deposit"]["amount"]
-
-def get_deposit_time_limit():
-    global config
-    return config["deposit"]["time"]
-
-def get_date_format():
-    global config
-    return config["date_format"]
-
-def get_mongo_connection():
-    global config
-    return config["mongo_connection"]
-
-#############################
 #        exceptions         #
 #############################
+
+
 class GiphyException(Exception):
     pass
+
 
 class GifNotFoundException(Exception):
     pass
 
+
 class DepositException(Exception):
     pass
 
+
 class DepositAmountLimitException(DepositException):
     pass
+
 
 class DepositDailyLimitException(DepositException):
     pass
@@ -123,20 +78,28 @@ class DepositDailyLimitException(DepositException):
 #############################
 #         functions         #
 #############################
+
+
 def get_epoch():
     return int(time.time())
+
 
 def get_full_name(update):
     return update.message.from_user.first_name + " " + update.message.from_user.last_name
 
+
 def get_investments(name):
     if name not in shares["investments"]:
-        init(name)
+        return None
     return shares["investments"][name]
+
 
 def get_deposits(name):
     investments = get_investments(name)
-    return investments["deposits"]
+    if investments is not None:
+        return investments["deposits"]
+    return []
+
 
 def init(name):
     shares["investments"][name] = {
@@ -146,20 +109,22 @@ def init(name):
         'total_shares': 0
     }
 
-def add_deposit(name, value):
-    investments = get_investments(name)
-    time = get_epoch()
-    limit = get_deposit_time_limit()
+
+def check_deposit_time(time, name, investments):
+    limit = config.get_deposit_time_limit()
     diff = time - investments["last_deposit"]
     if(diff < limit):
         logger.debug('"%s" deposit time limit is set to "%s", last deposit was "%s" secs ago' % (name, limit, diff))
-        message = 'deposit time limit is set to ' + str(limit) + ', last deposit was ' + str(diff) + ' secs ago'
+        message = 'deposit time limit is set to' + str(limit) + ', last deposit was ' + str(diff) + ' secs ago'
         raise DepositDailyLimitException(message)
 
-    limit = get_deposit_amount_limit()
+
+def check_deposit_amount(name, value):
+    limit = config.get_deposit_amount_limit()
     if value > limit:
         logger.debug('"%s" deposit (%s) is over current limit of: "%s"' % (name, value, limit))
         raise DepositAmountLimitException("deposit limit is set to " + str(limit))
+
 
 def add_deposit(name, value):
     time = get_epoch()
@@ -168,7 +133,7 @@ def add_deposit(name, value):
         if investment is not None:
             check_deposit_time(time, name, investment)
             check_deposit_amount(name, value)
-        if investments is None:
+        if investment is None:
             init(name)
             investment = get_investments(name)
             db.investments.insert_one(investment)
@@ -185,6 +150,7 @@ def add_deposit(name, value):
     db.investments.update_one({'name': name}, {'$push': {'deposits': deposit}})
     investment["total_shares"] = round(investment["total_shares"] + value, 2)
     shares["total_investment"] = round(shares["total_investment"] + value, 2)
+
 
 def get_string_shares():
     status = "Total investment: *"
@@ -204,17 +170,19 @@ def get_string_shares():
         status += "* of the company\n"
     return status
 
+
 def get_string_history(name):
     history = ""
     for data in get_deposits(name):
         history += "on _"
-        history += time.strftime(get_date_format(), time.localtime(data["timestamp"]))
+        history += time.strftime(config.get_date_format(), time.localtime(data["timestamp"]))
         history += "_ deposited *"
         history += str(data["amount"])
         history += " €*\n"
     if history == "":
         history = "you have no shares! go to Notaro!!!"
     return history
+
 
 def get_gif(api_key, query):
     endpoint = "https://api.giphy.com/v1/gifs/search"
@@ -243,29 +211,37 @@ def get_gif(api_key, query):
     except IndexError:
         raise GifNotFoundException
 
+
 def parse_float_deposit(text):
     value = float(re.sub(r'(?i)/deposit(?:@supergeneratorbot)?\s+', "", text))
     if value <= 0:
         raise ValueError
     return value
 
+
 def persist(shares):
-    if get_mongo_connection() is None:
+    if config.get_mongo_connection() is None:
         client = MongoClient()
-    else
-        uri = "mongodb://%s:%s@%s" % (quote_plus(user), quote_plus(password), host)
+    else:
+        host = config.get_mongo_host()
+        user = quote_plus(config.get_mongo_user())
+        password = quote_plus(config.get_mongo_password())
+        uri = "mongodb://%s:%s@%s" % (user, password, host)
         client = MongoClient(uri)
     db = client.supergenerator
     db.shares.insertOne(user)
-    # TODO add serializer shares -> mongodb structure    
+    # TODO add serializer shares -> mongodb structure
 
 #############################
 #         commands          #
 #############################
+
+
 def start(bot, update):
     chat_id = update.message.chat_id
     logger.debug('start command received from chat "%s"' % (chat_id))
     bot.send_message(chat_id=chat_id, text="supergenerator is under aggressive development")
+
 
 def generate(bot, update):
     chat_id = update.message.chat_id
@@ -278,6 +254,7 @@ def generate(bot, update):
     sequence_string = ', '.join(map(str, sequence))
     logger.debug('generated sequence is: "%s"' % (sequence_string))
     bot.send_message(chat_id=chat_id, text="supergenerated sequence: " + sequence_string)
+
 
 def deposit(bot, update):
     chat_id = update.message.chat_id
@@ -297,18 +274,21 @@ def deposit(bot, update):
         bot.send_message(chat_id=chat_id, text=str(e))
         return
 
+
 def status(bot, update):
     chat_id = update.message.chat_id
     bot.send_message(chat_id=chat_id, text=get_string_shares(), parse_mode=telegram.ParseMode.MARKDOWN)
+
 
 def history(bot, update):
     chat_id = update.message.chat_id
     name = get_full_name(update)
     bot.send_message(chat_id=chat_id, text=get_string_history(name), parse_mode=telegram.ParseMode.MARKDOWN)
 
+
 def easter(bot, update):
     chat_id = update.message.chat_id
-    giphy_key = get_giphy_key()
+    giphy_key = config.get_giphy_key()
     if giphy_key == "":
         # act as an echo bot
         bot.send_message(chat_id=chat_id, text=update.message.text)
@@ -322,16 +302,19 @@ def easter(bot, update):
     except GifNotFoundException:
         bot.send_message(chat_id=chat_id, text='nothing fun to say about "' + update.message.text + '"')
 
+
 def error(bot, update, error):
     logger.error('Update "%s" caused error "%s"' % (update, error))
 
 #############################
 #           main            #
 #############################
-def main():
-    read_config()
 
-    updater = Updater(token=get_telegram_key())
+
+def main():
+    config.read_config('settings.json')
+
+    updater = Updater(token=config.get_telegram_key())
 
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher
@@ -354,6 +337,7 @@ def main():
 
     # Run the bot until you press Ctrl-C or the process receives SIGINT, SIGTERM or SIGABRT.
     updater.idle()
+
 
 if __name__ == '__main__':
     main()
