@@ -114,3 +114,7 @@ run/*
 
 # settings
 settings.json
+
+# vscode
+.vscode/*
+*.code-workspace
