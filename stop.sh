@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 
+PROGRAM=supergeneratorbot
+
 RUN_DIR=./run
-PID_FILE=$RUN_DIR/supergeneratorbot.pid
+PID_FILE=$RUN_DIR/$PROGRAM.pid
 if [ ! -f $PID_FILE ]; then
   echo "pid file ($PID_FILE) not found!"
   exit 1
