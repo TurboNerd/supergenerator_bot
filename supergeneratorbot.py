@@ -17,7 +17,8 @@ import urllib
 import config
 
 # enable logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
+logFormat = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+logging.basicConfig(format=logFormat, level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # preserve deposits. TODO use mongo!
